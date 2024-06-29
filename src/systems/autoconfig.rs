@@ -1,12 +1,16 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use serenity::all::{ChannelId, ChannelType, Colour, CreateChannel, EditChannel, EditRole, GuildChannel, GuildId, PermissionOverwrite, PermissionOverwriteType, Permissions};
-use crate::Context;
-use crate::data::Database;
-use crate::systems::autoconfig::ServerConfigChannel::{Category, Text};
-use eyre::Result;
+use crate::config::get_bot_id;
 use crate::data::rng::Random;
 use crate::data::state::{DBEvent, DBServer};
+use crate::data::Database;
+use crate::systems::autoconfig::ServerConfigChannel::{Category, Text, Voice};
+use crate::Context;
+use eyre::Result;
+use serde::{Deserialize, Serialize};
+use serenity::all::{Channel, ChannelId, ChannelType, Colour, CreateChannel, EditChannel, EditRole, GuildChannel, GuildId, PermissionOverwrite, PermissionOverwriteType, Permissions, RoleId, UserId};
+use std::collections::HashMap;
+use serenity::all::CommandPermissionType::Role;
+use thiserror::Error;
+use tokio::time::Instant;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct ServerConfigChannelId(pub String);
@@ -26,20 +30,20 @@ pub struct ServerConfig {
     children: Vec<ServerConfigChannelId>,
     channels: HashMap<ServerConfigChannelId, ServerConfigChannel>,
     roles: HashMap<ServerConfigRoleId, ServerConfigRole>,
-    role_order: Vec<ServerConfigRoleId>
+    role_order: Vec<ServerConfigRoleId>,
 }
 
 pub struct ServerConfigRole {
     name: String,
     color: Colour,
-    permissions: Permissions
+    permissions: Permissions,
 }
 
 #[derive(Clone)]
 pub struct ServerConfigPermissionOverwrite {
     allow: Permissions,
     deny: Permissions,
-    role: ServerConfigRoleId
+    role: ServerConfigRoleId,
 }
 
 impl ServerConfigPermissionOverwrite {
@@ -47,45 +51,96 @@ impl ServerConfigPermissionOverwrite {
         PermissionOverwrite {
             allow: self.allow,
             deny: self.deny,
-            kind: PermissionOverwriteType::Role(server.roles[&self.role])
+            kind: PermissionOverwriteType::Role(server.roles[&self.role]),
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum AutoconfigError {
+    #[error("an option returned none")]
+    OptionIsNone
 }
 
 #[derive(Clone)]
 pub struct ServerConfigPermissions {
     overrides: Vec<ServerConfigPermissionOverwrite>,
-    base: Permissions
+    base: Permissions,
+}
+
+trait ConsistentOrder {
+    fn consistent_order(&self) -> Vec<PermissionOverwrite>;
+}
+
+impl ConsistentOrder for Vec<PermissionOverwrite> {
+    fn consistent_order(&self) -> Vec<PermissionOverwrite> {
+        let mut copy = self.clone();
+
+        copy.sort_by(| a, b | {
+            let num_a = match a.kind {
+                PermissionOverwriteType::Role(r) => r.get(),
+                PermissionOverwriteType::Member(m) => m.get(),
+                _ => todo!()
+            };
+
+            let num_b = match b.kind {
+                PermissionOverwriteType::Role(r) => r.get(),
+                PermissionOverwriteType::Member(m) => m.get(),
+                _ => todo!()
+            };
+
+            num_a.cmp(&num_b)
+        });
+
+        copy
+    }
 }
 
 pub struct ServerConfigTextLike {
     name: String,
     description: String,
-    permissions: ServerConfigPermissions
+    permissions: ServerConfigPermissions,
 }
 
 impl ServerConfigTextLike {
     fn check_dirty(&self, channel: &GuildChannel, server: &DBServer) -> bool {
         if self.name.clone() != channel.name {
-            return true
+            return true;
         }
         if Some(self.description.clone()) != channel.topic {
-            return true
+            return true;
         }
-        if Some(self.permissions.base) != channel.permissions {
-            return true
-        }
-        if self.permissions.overrides.iter().map(| x | x.as_overwrite(server)).collect::<Vec<PermissionOverwrite>>() != channel.permission_overwrites {
-            return true
+        if overrides(&channel.guild_id, &server, &self.permissions).consistent_order() != channel.permission_overwrites.consistent_order()
+        {
+            return true;
         }
         false
     }
 
-    fn build(&self, server: &DBServer) -> CreateChannel {
-        CreateChannel::new(self.name.clone())
+    fn build(&self, guild: &GuildId, server: &DBServer) -> EditChannel {
+        EditChannel::new()
+            .name(self.name.clone())
             .topic(self.description.clone())
-            .permissions(self.permissions.overrides.iter().map(| x | x.as_overwrite(server)).collect::<Vec<PermissionOverwrite>>())
+            .permissions(
+                overrides(guild, server, &self.permissions)
+            )
     }
+}
+
+fn overrides(guild_id: &GuildId, server: &DBServer, perms: &ServerConfigPermissions) -> Vec<PermissionOverwrite> {
+    let mut overrides = perms.overrides.iter()
+        .map(|x| x.as_overwrite(server))
+        .collect::<Vec<PermissionOverwrite>>();
+
+    let guild_num = guild_id.get();
+
+    overrides.push(PermissionOverwrite {
+        kind: PermissionOverwriteType::Role(RoleId::new(guild_num)),
+        allow: perms.base,
+        deny: Permissions::empty()
+    });
+
+    overrides
 }
 
 pub enum ServerConfigChannel {
@@ -94,12 +149,12 @@ pub enum ServerConfigChannel {
     News(ServerConfigTextLike),
     Voice {
         name: String,
-        permissions: ServerConfigPermissions
+        permissions: ServerConfigPermissions,
     },
     Category {
         name: String,
-        children: Vec<ServerConfigChannelId>
-    }
+        children: Vec<ServerConfigChannelId>,
+    },
 }
 
 impl ServerConfigChannel {
@@ -109,23 +164,69 @@ impl ServerConfigChannel {
             ServerConfigChannel::Rules(_) => ChannelType::Text,
             ServerConfigChannel::News(_) => ChannelType::News,
             ServerConfigChannel::Voice { .. } => ChannelType::Voice,
-            Category { .. } => ChannelType::Category
+            Category { .. } => ChannelType::Category,
         }
+    }
+
+    fn build(
+        &self,
+        guild_id: &GuildId,
+        server: &DBServer,
+    ) -> EditChannel {
+        (match self {
+            Text(tl) => tl.build(guild_id, server),
+            ServerConfigChannel::Rules(tl) => tl.build(guild_id, server),
+            ServerConfigChannel::News(tl) => tl.build(guild_id, server),
+            ServerConfigChannel::Voice { name, permissions } => EditChannel::new()
+                .name(name)
+                .permissions(
+                    overrides(guild_id, server, permissions)
+                ),
+            Category { name, children: _ } => EditChannel::new().name(name),
+        }).kind(self.kind())
+    }
+
+    fn check_dirty(
+        &self,
+        channel: &GuildChannel,
+        server: &DBServer,
+    ) -> bool {
+        match self {
+            Text(tl) => return tl.check_dirty(channel, server),
+            ServerConfigChannel::Rules(tl) => return tl.check_dirty(channel, server),
+            ServerConfigChannel::News(tl) => return tl.check_dirty(channel, server),
+            ServerConfigChannel::Voice { name, permissions } => {
+                if name.clone() != channel.name {
+                    return true;
+                }
+                if overrides(&channel.guild_id, server, permissions).consistent_order() != channel.permission_overwrites.consistent_order()
+                {
+                    return true;
+                }
+            }
+            Category { name, children: _ } => {
+                if name.clone() != channel.name {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 }
 
 trait LazyOrder {
-    async fn lazy_order(&self, ctx: &Context<'_>, children: &[ChannelId]) -> Result<()>;
+    async fn lazy_order(&self, ctx: &Context<'_>, children: &[ChannelId], channels: &HashMap<ChannelId, GuildChannel>) -> Result<()>;
 }
 
 impl LazyOrder for GuildId {
-    async fn lazy_order(&self, ctx: &Context<'_>, children: &[ChannelId]) -> Result<()> {
+    async fn lazy_order(&self, ctx: &Context<'_>, children: &[ChannelId], channels: &HashMap<ChannelId, GuildChannel>) -> Result<()> {
         let mut should_be_ordered = false;
 
         let mut last_index = -1;
 
         for child in children {
-            let pos = child.to_channel(ctx).await?.guild().unwrap().position;
+            let pos = channels[child].position;
 
             if pos as i32 > last_index {
                 last_index = pos as i32;
@@ -134,26 +235,32 @@ impl LazyOrder for GuildId {
             }
         }
 
-        if !should_be_ordered { return Ok(()) }
+        if !should_be_ordered {
+            return Ok(());
+        }
 
         let mut index = 0u64;
 
-        self.reorder_channels(ctx, children.iter().map(| x | {
-            index += 1;
+        self.reorder_channels(
+            ctx,
+            children.iter().map(|x| {
+                index += 1;
 
-            (*x, index)
-        })).await?;
+                (*x, index)
+            }),
+        )
+        .await?;
 
         Ok(())
     }
 }
 
 macro_rules! role {
-    ($config:expr, $id:expr, $opts:expr) => {
+    ($config:expr, $id:expr, $opts:expr) => {{
         $config.roles.insert(role($id), $opts);
 
         $config.role_order.push(role($id));
-    };
+    }};
 }
 
 macro_rules! channel {
@@ -166,40 +273,54 @@ macro_rules! channel {
     }};
 }
 
+pub struct Place<'a> {
+    name: &'a str,
+    id: &'a str,
+}
+
+static PLACES: &[Place] = &[
+    Place {
+        name: "The Forest",
+        id: "forest",
+    },
+    Place {
+        name: "The Deep Forest",
+        id: "deep-forest",
+    },
+];
 
 impl Database {
     pub async fn update_config(&mut self, ctx: &Context<'_>, guild_id: &GuildId) -> Result<()> {
-        self.update_server(ctx, self.get_config(guild_id), guild_id).await?;
+        self.update_server(ctx, self.get_config(guild_id), guild_id)
+            .await?;
 
         Ok(())
     }
 
-    async fn update_server(&mut self, ctx: &Context<'_>, server_config: ServerConfig, guild_id: &GuildId) -> Result<()> {
-        let server = self.state().get_server_or_default(guild_id);
+    async fn update_server(
+        &mut self,
+        ctx: &Context<'_>,
+        server_config: ServerConfig,
+        guild_id: &GuildId,
+    ) -> Result<()> {
+        let mut server = self.state().get_server_or_default(guild_id);
+
+        let mut roles = guild_id.roles(ctx).await?;
 
         // Step A.1: Ensure all declared roles exist
         for id in server_config.roles.keys() {
-            let exists = if server.roles.contains_key(id) {
-                let roles = guild_id.roles(ctx).await;
-
-                roles.is_ok() && {
-                    let roles = roles.unwrap();
-
-                    roles.contains_key(&server.roles[id])
-                }
-            } else {
-                false
-            };
+            let exists = server.roles.contains_key(id) &&
+                roles.contains_key(&server.roles[id]);
 
             if !exists {
-                let role = ctx.http()
-                    .get_guild(*guild_id).await?
-                    .create_role(ctx.http(), EditRole::new().name("name pending")).await?;
+                let role = guild_id
+                    .create_role(ctx, EditRole::new().name("name pending"))
+                    .await?;
 
                 self.add(DBEvent::RoleAdd {
                     server: *guild_id,
                     id: id.clone(),
-                    discord_id: role.id
+                    discord_id: role.id,
                 })?;
             }
         }
@@ -214,75 +335,91 @@ impl Database {
         }
 
         // Step A.3: Delete unused roles
-        let mut roles = guild_id.roles(ctx).await?;
+        let (role, my_pos) = guild_id
+            .member(ctx, get_bot_id())
+            .await?
+            .highest_role_info(ctx)
+            .ok_or(AutoconfigError::OptionIsNone)?;
+
         for (id, role) in &mut roles {
             if !used_roles.contains(id) {
-                let _ = role.delete(ctx).await;
+                if role.position > my_pos {
+                    role.delete(ctx).await?;
+                }
             }
         }
 
         // Step A.4: Configure misconfigured roles
         for (id, config) in &server_config.roles {
             let mut role = roles[&server.roles[id]].clone();
-            let dirty =
-                role.colour != config.color ||
-                role.name != config.name ||
-                role.permissions != config.permissions;
+            let dirty = role.colour != config.color
+                || role.name != config.name
+                || role.permissions != config.permissions;
 
             if dirty {
-                role.edit(ctx, EditRole::new()
-                    .name(&config.name)
-                    .colour(config.color)
-                    .permissions(config.permissions)
-                ).await?;
+                role.edit(
+                    ctx,
+                    EditRole::new()
+                        .name(&config.name)
+                        .colour(config.color)
+                        .permissions(config.permissions),
+                )
+                .await?;
             }
         }
 
         // Step A.5: Order roles
         {
-            let mut idx = 0;
+            let mut idx = my_pos;
 
             for role in server_config.role_order {
+                idx -= 1;
+
                 let mut discord = roles[&server.roles[&role]].clone();
 
-                if discord.position != idx {
-                    let _ = discord.edit(ctx, EditRole::new()
-                        .position(idx)).await;
+                if idx > my_pos || discord.position > my_pos {
+                    println!("warn: role {} will go over, or is over current role, cancelled operation", role.0);
+                    continue;
                 }
 
-                idx = discord.position + 1;
+                if discord.position != idx {
+                    guild_id.edit_role_position(ctx, discord, idx).await?;
+                }
             }
         }
 
         // Step B.1: Ensure all declared channels exist
+        let mut channels = guild_id.channels(ctx).await?;
+
         for id in server_config.channels.keys() {
-            let exists = if server.channels.contains_key(id) {
-                let channel = ctx.http().get_channel(server.channels[id]).await;
-
-                if channel.is_ok() {
-                    let channel = channel.unwrap();
-
-                    channel.guild().unwrap().kind == server_config.channels[id].kind()
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
+            let exists = server.channels.contains_key(id)
+                && { if !channels.contains_key(&server.channels[id]) {
+                    channels = guild_id.channels(ctx).await?
+                }; true}
+                && channels.contains_key(&server.channels[id])
+                && channels[&server.channels[id]].kind == server_config.channels[id].kind(); // fixme: hell
 
             if !exists {
-                let channel = ctx.http()
-                    .get_guild(*guild_id).await?
-                    .create_channel(ctx.http(),
-                        CreateChannel::new(format!("uninitialized-{}", Random::new().get(0f32..1f32)))
-                            .kind(server_config.channels[id].kind())
-                    ).await?;
+                let channel = guild_id
+                    .create_channel(
+                        ctx,
+                        CreateChannel::new(format!(
+                            "uninitialized-{}",
+                            Random::new().get(0f32..1f32)
+                        ))
+                        .kind(server_config.channels[id].kind()),
+                    )
+                    .await?;
 
                 self.add(DBEvent::ChannelAdd {
                     server: *guild_id,
                     id: id.clone(),
-                    discord_id: channel.id
+                    discord_id: channel.id,
                 })?;
+
+                server = self.state().get_server_or_default(guild_id); // fixme: this is f***ing evil
+
+                channels.insert(server.channels[id], channel);
             }
         }
 
@@ -290,55 +427,10 @@ impl Database {
         for (id, config) in &server_config.channels {
             let channel_id = server.channels[id];
 
-            let channel = ctx.http().get_channel(channel_id).await?;
+            let guild = &channels[&channel_id];
 
-            let guild_channel = channel.guild().unwrap();
-
-            fn check_dirty(channel: &GuildChannel, config: &ServerConfigChannel, server: &DBServer) -> bool {
-                match config {
-                    Text(tl) => {
-                        return tl.check_dirty(channel, server)
-                    }
-                    ServerConfigChannel::Rules(tl) => {
-                        return tl.check_dirty(channel, server)
-                    }
-                    ServerConfigChannel::News(tl) => {
-                        return tl.check_dirty(channel, server)
-                    }
-                    ServerConfigChannel::Voice { name, permissions } => {
-                        if name.clone() != channel.name {
-                            return true
-                        }
-                        if Some(permissions.base) != channel.permissions {
-                            return true
-                        }
-                        if permissions.overrides.iter().map(| x | x.as_overwrite(server)).collect::<Vec<PermissionOverwrite>>() != channel.permission_overwrites {
-                            return true
-                        }
-                    }
-                    Category { name, children:_ } => {
-                        if name.clone() != channel.name {
-                            return true
-                        }
-                    }
-                }
-
-                false
-            }
-
-            fn build<'a>(channel: &'a ServerConfigChannel, server: &'a DBServer) -> CreateChannel<'a> {
-                (match channel {
-                    Text(tl) => tl.build(server),
-                    ServerConfigChannel::Rules(tl) => tl.build(server),
-                    ServerConfigChannel::News(tl) => tl.build(server),
-                    ServerConfigChannel::Voice { name, permissions } => CreateChannel::new(name)
-                        .permissions(permissions.overrides.iter().map(| x | x.as_overwrite(server)).collect::<Vec<PermissionOverwrite>>()),
-                    Category { name, children:_ } => CreateChannel::new(name)
-                }).kind(channel.kind())
-            }
-
-            if check_dirty(&guild_channel, config, &server) {
-                ctx.http().edit_channel(channel_id, &build(config, &server), Some("Quicksilver autoconfig")).await?;
+            if config.check_dirty(&guild, &server) {
+                channel_id.edit(ctx, config.build(&guild_id, &server)).await?;
             }
         }
 
@@ -359,31 +451,44 @@ impl Database {
         }
 
         // B.5. Arrange
-        guild_id.lazy_order(ctx,
-            &server_config.children.iter().map(| x | {
-                server.channels[x]
-            }).collect::<Vec<ChannelId>>()
-        ).await?;
+        guild_id
+            .lazy_order(
+                ctx,
+                &server_config
+                    .children
+                    .iter()
+                    .map(|x| server.channels[x])
+                    .collect::<Vec<ChannelId>>(),
+                &channels
+            )
+            .await?;
 
         for (id, config) in &server_config.channels {
-            if let Category { name:_, children } = config {
+            if let Category { name: _, children } = config {
                 let channel_id = server.channels[id];
 
                 for child in children.iter() {
                     let child_id = server.channels[child];
 
-                    let mut guild = child_id.to_channel(ctx).await?.guild().unwrap();
+                    let mut guild = channels[&child_id].clone();
 
                     if guild.parent_id != Some(channel_id) {
-                        guild.edit(ctx, EditChannel::new().category(channel_id)).await?;
+                        guild
+                            .edit(ctx, EditChannel::new().category(channel_id))
+                            .await?;
                     }
                 }
 
-                guild_id.lazy_order(ctx,
-                    &children.iter().map(| x | {
-                        server.channels[x]
-                    }).collect::<Vec<ChannelId>>()
-                ).await?;
+                guild_id
+                    .lazy_order(
+                        ctx,
+                        &children
+                            .iter()
+                            .map(|x| server.channels[x])
+                            .collect::<Vec<ChannelId>>(),
+                        &channels
+                    )
+                    .await?;
             }
         }
 
@@ -399,30 +504,98 @@ impl Database {
         };
 
         // Roles
-        role!(config, "admin", ServerConfigRole {
-            name: "Admin".to_string(),
-            permissions: Permissions::all(),
-            color: Colour(0xFF0000)
-        });
+        role!(
+            config,
+            "admin",
+            ServerConfigRole {
+                name: "Admin".to_string(),
+                permissions: Permissions::all(),
+                color: Colour(0xFF0000)
+            }
+        );
 
-        role!(config, "operator", ServerConfigRole {
-            name: "Operator".to_string(),
-            permissions: Permissions::all(),
-            color: Colour(0x00FFFF)
-        });
+        role!(
+            config,
+            "operator",
+            ServerConfigRole {
+                name: "Operator".to_string(),
+                permissions: Permissions::all(),
+                color: Colour(0x00FFFF)
+            }
+        );
+
+        for place in PLACES {
+            role!(
+                config,
+                &format!("place/{}", place.id),
+                ServerConfigRole {
+                    name: format!("📍 {}", place.name),
+                    color: Colour(0x000000),
+                    permissions: Permissions::empty()
+                }
+            );
+        }
 
         // Channels
-        config.children.push(channel!(config, "chats", Category {
-            name: "global-chats".to_string(),
-            children: (1..5).map(| x | channel!(config, &format!("chats/global-{}", x), Text(ServerConfigTextLike {
-                name: format!("global-chat-{}", x),
-                description: "A global chat".to_string(),
-                permissions: ServerConfigPermissions {
-                    base: Permissions::default(),
-                    overrides: vec![]
+        config.children.push(channel!(
+            config,
+            "chats",
+            Category {
+                name: "~ EVERYWHERE ~".to_string(),
+                children: (1..5)
+                    .map(|x| channel!(
+                        config,
+                        &format!("chats/global-{}", x),
+                        Text(ServerConfigTextLike {
+                            name: format!("global-chat-{}", x),
+                            description: "A global chat".to_string(),
+                            permissions: ServerConfigPermissions {
+                                base: Permissions::default(),
+                                overrides: vec![]
+                            }
+                        })
+                    ))
+                    .collect(),
+            }
+        ));
+
+        for place in PLACES {
+            let visible_only_here = ServerConfigPermissions {
+                base: Permissions::default() & !Permissions::VIEW_CHANNEL,
+                overrides: vec![ServerConfigPermissionOverwrite {
+                    role: role(&format!("place/{}", place.id)),
+                    allow: Permissions::VIEW_CHANNEL,
+                    deny: Permissions::empty(),
+                }],
+            };
+
+            config.children.push(channel!(
+                config,
+                &format!("places/{}", place.id),
+                Category {
+                    name: format!("~ {} ~", place.name),
+                    children: vec![
+                        channel!(
+                            config,
+                            &format!("places/{}/text", place.id),
+                            Text(ServerConfigTextLike {
+                                name: format!("{}-text", place.id),
+                                description: "A place in Alternate Reality".to_string(),
+                                permissions: visible_only_here.clone()
+                            })
+                        ),
+                        channel!(
+                            config,
+                            &format!("places/{}/vc", place.id),
+                            Voice {
+                                name: format!("{}-vc", place.id),
+                                permissions: visible_only_here.clone()
+                            }
+                        ),
+                    ]
                 }
-            }))).collect(),
-        }));
+            ));
+        }
 
         config
     }

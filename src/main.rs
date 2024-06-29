@@ -62,11 +62,6 @@ async fn eyre_main() -> Result<()> {
                 admin_burn(),
                 test()
             ],
-            on_error: |err| {
-                Box::pin(async move {
-                    dbg!(err);
-                })
-            },
 
             // And default settings
             ..Default::default()
