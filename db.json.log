@@ -1,0 +1,197 @@
+DBState {
+    counter: 0,
+    people_who_counted: {},
+    flips_in_a_row: 0,
+    users: {
+        UserId(
+            1136701682131144714,
+        ): DBUser {
+            this_levels_xp: 70,
+            xp_until_next_level: 102,
+            level: 2,
+            items: [],
+            life: Living(hp: 150/150),
+        },
+        UserId(
+            1185370987655610379,
+        ): DBUser {
+            this_levels_xp: 18,
+            xp_until_next_level: 100,
+            level: 1,
+            items: [],
+            life: Living(hp: 150/150),
+        },
+        UserId(
+            1253145465461932063,
+        ): DBUser {
+            this_levels_xp: 28,
+            xp_until_next_level: 100,
+            level: 1,
+            items: [],
+            life: Living(hp: 150/150),
+        },
+    },
+    servers: {
+        GuildId(
+            1253105126600867921,
+        ): DBServer {
+            channels: {
+                ServerConfigChannelId(
+                    "chats",
+                ): ChannelId(
+                    1256352152239083550,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-11",
+                ): ChannelId(
+                    1256352662522433649,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-24",
+                ): ChannelId(
+                    1256352687197261844,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-15",
+                ): ChannelId(
+                    1256352678599200768,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-4",
+                ): ChannelId(
+                    1256352154852130879,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-8",
+                ): ChannelId(
+                    1256352660895039499,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-6",
+                ): ChannelId(
+                    1256352676686598165,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-1",
+                ): ChannelId(
+                    1256352153304563755,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-20",
+                ): ChannelId(
+                    1256352656650403880,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-10",
+                ): ChannelId(
+                    1256352666938904618,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-16",
+                ): ChannelId(
+                    1256352669648294020,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-18",
+                ): ChannelId(
+                    1256352673569968228,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-5",
+                ): ChannelId(
+                    1256352675080179935,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-19",
+                ): ChannelId(
+                    1256352680000094220,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-21",
+                ): ChannelId(
+                    1256352681652650037,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-9",
+                ): ChannelId(
+                    1256352665462636609,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-17",
+                ): ChannelId(
+                    1256352671728930878,
+                ),
+                ServerConfigChannelId(
+                    "category",
+                ): ChannelId(
+                    1255621878945677382,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-14",
+                ): ChannelId(
+                    1256352653273862185,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-23",
+                ): ChannelId(
+                    1256352683678371842,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-2",
+                ): ChannelId(
+                    1256352150506705019,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-12",
+                ): ChannelId(
+                    1256352664023990385,
+                ),
+                ServerConfigChannelId(
+                    "test",
+                ): ChannelId(
+                    1255621876965834753,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-7",
+                ): ChannelId(
+                    1256352651835342959,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-22",
+                ): ChannelId(
+                    1256352685435912322,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-3",
+                ): ChannelId(
+                    1256352149160464435,
+                ),
+                ServerConfigChannelId(
+                    "chats/global-13",
+                ): ChannelId(
+                    1256352658340446292,
+                ),
+            },
+            roles: {
+                ServerConfigRoleId(
+                    "admin",
+                ): RoleId(
+                    1256357179607224351,
+                ),
+                ServerConfigRoleId(
+                    "silly",
+                ): RoleId(
+                    1256352146136502356,
+                ),
+                ServerConfigRoleId(
+                    "operator",
+                ): RoleId(
+                    1256362423687053313,
+                ),
+            },
+        },
+    },
+    last_typed_user: UserId(
+        1253145465461932063,
+    ),
+}
