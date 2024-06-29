@@ -34,15 +34,23 @@ pub struct Place<'a> {
 	id: &'a str,
 }
 
+macro_rules! place {
+	($name: expr, $id: expr) => {
+		Place {
+			name: $name,
+			id: $id,
+		}
+	};
+}
+
 static PLACES: &[Place] = &[
-	Place {
-		name: "The Forest",
-		id: "forest",
-	},
-	Place {
-		name: "The Deep Forest",
-		id: "deep-forest",
-	},
+	place!("The Forest", "forest"),
+	place!("The Capital", "capital"),
+	place!("Sir Minsley's Castle", "minsley-manor"),
+	place!("Zyex's Home", "zyex-house"),
+	place!("Moonpool's Observatory", "moonpool-observatory"),
+	place!("Vivi's Tower", "vivi-tower"),
+	place!("Test Area", "test"),
 ];
 
 impl Database {

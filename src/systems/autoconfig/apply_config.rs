@@ -159,6 +159,10 @@ impl Database {
 					id: id.clone(),
 					discord_id: role.id,
 				})?;
+
+				server = self.state().get_server_or_default(guild_id);
+
+				roles.insert(role.id, role);
 			}
 		}
 
@@ -212,6 +216,12 @@ impl Database {
 		}
 
 		// Step A.5: Order roles
+		let (_, my_pos) = guild_id
+			.member(ctx, get_bot_id())
+			.await?
+			.highest_role_info(ctx)
+			.ok_or(AutoconfigError::OptionIsNone)?;
+
 		{
 			let mut idx = my_pos;
 
