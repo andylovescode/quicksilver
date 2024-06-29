@@ -1,0 +1,4 @@
+imports_granularity="Crate"
+wrap_comments = true
+fn_single_line = true
+hard_tabs = true

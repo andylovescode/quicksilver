@@ -3,76 +3,76 @@ use serenity::all::Colour;
 
 #[derive(Debug)]
 pub enum Rarity {
-    Common,
-    Uncommon,
-    Rare,
-    Mythical,
-    Unique,
+	Common,
+	Uncommon,
+	Rare,
+	Mythical,
+	Unique,
 }
 
 impl Rarity {
-    pub fn color(&self) -> Colour {
-        match self {
-            Rarity::Common => Colour(0xFFFFFF),
-            Rarity::Uncommon => Colour(0x00FFA8),
-            Rarity::Rare => Colour(0xF4DC00),
-            Rarity::Mythical => Colour(0x6A00DF),
-            Rarity::Unique => Colour(0xFF0081),
-        }
-    }
+	pub fn color(&self) -> Colour {
+		match self {
+			Rarity::Common => Colour(0xFFFFFF),
+			Rarity::Uncommon => Colour(0x00FFA8),
+			Rarity::Rare => Colour(0xF4DC00),
+			Rarity::Mythical => Colour(0x6A00DF),
+			Rarity::Unique => Colour(0xFF0081),
+		}
+	}
 
-    pub fn name(&self) -> &str {
-        match self {
-            Rarity::Common => "[common]",
-            Rarity::Uncommon => "[uncommon]",
-            Rarity::Rare => "[rare]",
-            Rarity::Mythical => "[mythical]",
-            Rarity::Unique => "[unique]",
-        }
-    }
+	pub fn name(&self) -> &str {
+		match self {
+			Rarity::Common => "[common]",
+			Rarity::Uncommon => "[uncommon]",
+			Rarity::Rare => "[rare]",
+			Rarity::Mythical => "[mythical]",
+			Rarity::Unique => "[unique]",
+		}
+	}
 }
 
 pub struct ItemInfo {
-    pub name: String,
-    pub rarity: Rarity,
-    pub description: String,
+	pub name: String,
+	pub rarity: Rarity,
+	pub description: String,
 }
 
 #[derive(
-    Serialize, Deserialize, Debug, Copy, Clone, Hash, Eq, PartialEq, poise::ChoiceParameter,
+	Serialize, Deserialize, Debug, Copy, Clone, Hash, Eq, PartialEq, poise::ChoiceParameter,
 )]
 pub enum InventoryItem {
-    #[name = "Testing Gizmo"]
-    TestGizmo,
+	#[name = "Testing Gizmo"]
+	TestGizmo,
 
-    #[name = "Stick"]
-    Stick,
+	#[name = "Stick"]
+	Stick,
 
-    #[name = "Rock"]
-    Rock,
+	#[name = "Rock"]
+	Rock,
 
-    #[name = "Wand"]
-    Wand,
+	#[name = "Wand"]
+	Wand,
 
-    #[name = "Scythe (Vivi)"]
-    ScytheVivi,
+	#[name = "Scythe (Vivi)"]
+	ScytheVivi,
 
-    #[name = "Ace of Spades"]
-    Ace,
+	#[name = "Ace of Spades"]
+	Ace,
 
-    #[name = "Cross (Minsley)"]
-    CrossMinsley,
+	#[name = "Cross (Minsley)"]
+	CrossMinsley,
 
-    #[name = "The Oracle Amulet"]
-    OracleAmulet,
+	#[name = "The Oracle Amulet"]
+	OracleAmulet,
 
-    #[name = "Gun"]
-    Gun,
+	#[name = "Gun"]
+	Gun,
 }
 
 impl InventoryItem {
-    pub fn info(&self) -> ItemInfo {
-        match self {
+	pub fn info(&self) -> ItemInfo {
+		match self {
             InventoryItem::TestGizmo => ItemInfo {
                     name: "Testing Gizmo".to_string(),
                     rarity: Rarity::Mythical,
@@ -119,5 +119,5 @@ impl InventoryItem {
                 description: "How the hell is this legal? (deals a lot of damage, but large surface area)".to_string()
             }
         }
-    }
+	}
 }
