@@ -14,27 +14,27 @@ pub fn channel(id: &str) -> ServerConfigChannelId { ServerConfigChannelId(id.to_
 pub fn role(id: &str) -> ServerConfigRoleId { ServerConfigRoleId(id.to_string()) }
 
 pub struct ServerConfig {
-	pub(crate) children: Vec<ServerConfigChannelId>,
-	pub(crate) channels: HashMap<ServerConfigChannelId, ServerConfigChannel>,
-	pub(crate) roles: HashMap<ServerConfigRoleId, ServerConfigRole>,
-	pub(crate) role_order: Vec<ServerConfigRoleId>,
+	pub children: Vec<ServerConfigChannelId>,
+	pub channels: HashMap<ServerConfigChannelId, ServerConfigChannel>,
+	pub roles: HashMap<ServerConfigRoleId, ServerConfigRole>,
+	pub role_order: Vec<ServerConfigRoleId>,
 }
 
 pub struct ServerConfigRole {
-	pub(crate) name: String,
-	pub(crate) color: Colour,
-	pub(crate) permissions: Permissions,
+	pub name: String,
+	pub color: Colour,
+	pub permissions: Permissions,
 }
 
 #[derive(Clone)]
 pub struct ServerConfigPermissionOverwrite {
-	pub(crate) allow: Permissions,
-	pub(crate) deny: Permissions,
-	pub(crate) role: ServerConfigRoleId,
+	pub allow: Permissions,
+	pub deny: Permissions,
+	pub role: ServerConfigRoleId,
 }
 
 impl ServerConfigPermissionOverwrite {
-	pub(crate) fn as_overwrite(&self, server: &DBServer) -> PermissionOverwrite {
+	pub fn as_overwrite(&self, server: &DBServer) -> PermissionOverwrite {
 		PermissionOverwrite {
 			allow: self.allow,
 			deny: self.deny,
@@ -45,8 +45,8 @@ impl ServerConfigPermissionOverwrite {
 
 #[derive(Clone)]
 pub struct ServerConfigPermissions {
-	pub(crate) overrides: Vec<ServerConfigPermissionOverwrite>,
-	pub(crate) base: Permissions,
+	pub overrides: Vec<ServerConfigPermissionOverwrite>,
+	pub base: Permissions,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
@@ -56,9 +56,9 @@ pub struct ServerConfigChannelId(pub String);
 pub struct ServerConfigRoleId(pub String);
 
 pub struct ServerConfigTextLike {
-	pub(crate) name: String,
-	pub(crate) description: String,
-	pub(crate) permissions: ServerConfigPermissions,
+	pub name: String,
+	pub description: String,
+	pub permissions: ServerConfigPermissions,
 }
 
 impl ServerConfigTextLike {
@@ -100,7 +100,7 @@ pub enum ServerConfigChannel {
 }
 
 impl ServerConfigChannel {
-	pub(crate) fn kind(&self) -> ChannelType {
+	pub fn kind(&self) -> ChannelType {
 		match self {
 			ServerConfigChannel::Text { .. } => ChannelType::Text,
 			ServerConfigChannel::Rules(_) => ChannelType::Text,
@@ -110,7 +110,7 @@ impl ServerConfigChannel {
 		}
 	}
 
-	pub(crate) fn build(&self, guild_id: &GuildId, server: &DBServer) -> EditChannel {
+	pub fn build(&self, guild_id: &GuildId, server: &DBServer) -> EditChannel {
 		(match self {
 			ServerConfigChannel::Text(tl) => tl.build(guild_id, server),
 			ServerConfigChannel::Rules(tl) => tl.build(guild_id, server),
@@ -123,7 +123,7 @@ impl ServerConfigChannel {
 		.kind(self.kind())
 	}
 
-	pub(crate) fn check_dirty(&self, channel: &GuildChannel, server: &DBServer) -> bool {
+	pub fn check_dirty(&self, channel: &GuildChannel, server: &DBServer) -> bool {
 		match self {
 			ServerConfigChannel::Text(tl) => return tl.check_dirty(channel, server),
 			ServerConfigChannel::Rules(tl) => return tl.check_dirty(channel, server),

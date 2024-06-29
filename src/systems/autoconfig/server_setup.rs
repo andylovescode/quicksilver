@@ -46,7 +46,7 @@ static PLACES: &[Place] = &[
 ];
 
 impl Database {
-	pub(crate) fn get_config(&self, _: &GuildId) -> ServerConfig {
+	pub fn get_config(&self, _: &GuildId) -> ServerConfig {
 		let mut config = ServerConfig {
 			children: vec![],
 			channels: HashMap::new(),
