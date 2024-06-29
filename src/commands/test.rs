@@ -1,12 +1,8 @@
 use eyre::Result;
-use serenity::all::{User};
 use crate::{
     Context,
     Error,
-    data::items::InventoryItem,
-    data::state::DBEvent,
-    utils::{Admin, GetDB},
-    data::state::SideChannel
+    utils::{Admin, GetDB}
 };
 use crate::systems::autoconfig::ServerConfigRoleId;
 

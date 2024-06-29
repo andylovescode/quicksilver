@@ -14,8 +14,6 @@ pub async fn inventory(ctx: Context<'_>, user: Option<User>) -> eyre::Result<(),
 
     let db = ctx.db("inventory").await;
 
-    let user = user;
-
     let db_user = if let Some(x) = &user {
         db.state().get_user_or_default(&x.id)
     } else {
@@ -35,11 +33,9 @@ pub async fn inventory(ctx: Context<'_>, user: Option<User>) -> eyre::Result<(),
     let mut count_map = HashMap::new();
 
     for item in db_user.items {
-        if !count_map.contains_key(&item) {
-            count_map.insert(item.clone(), 0u64);
-        }
+        count_map.entry(item).or_insert(0u64);
 
-        count_map.insert(item.clone(), count_map[&item] + 1);
+        count_map.insert(item, count_map[&item] + 1);
     }
 
     let mut message = CreateReply::default();

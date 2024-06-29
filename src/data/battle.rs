@@ -15,6 +15,12 @@ pub enum LivingBuilderError {
     HealthGreaterThanMaxHealth
 }
 
+impl Default for LivingBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LivingBuilder {
     pub fn new() -> Self {
         Self {
@@ -62,10 +68,6 @@ impl Debug for Living {
 }
 
 impl Living {
-    pub fn new() -> LivingBuilder {
-        LivingBuilder::new()
-    }
-
     pub fn heal(&mut self, amount: u32) {
         self.health = min(
             self.max_health,

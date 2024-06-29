@@ -8,6 +8,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Random(u32);
 
+impl Default for Random {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Random {
     pub fn new() -> Self {
         Self(

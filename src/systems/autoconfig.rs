@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use serenity::all::{ChannelId, ChannelType, Color, Colour, CreateChannel, EditChannel, EditRole, GuildChannel, GuildId, PermissionOverwrite, PermissionOverwriteType, Permissions};
+use serenity::all::{ChannelId, ChannelType, Colour, CreateChannel, EditChannel, EditRole, GuildChannel, GuildId, PermissionOverwrite, PermissionOverwriteType, Permissions};
 use crate::Context;
 use crate::data::Database;
 use crate::systems::autoconfig::ServerConfigChannel::{Category, Text};
@@ -78,7 +78,7 @@ impl ServerConfigTextLike {
         if self.permissions.overrides.iter().map(| x | x.as_overwrite(server)).collect::<Vec<PermissionOverwrite>>() != channel.permission_overwrites {
             return true
         }
-        return false
+        false
     }
 
     fn build(&self, server: &DBServer) -> CreateChannel {
@@ -115,11 +115,11 @@ impl ServerConfigChannel {
 }
 
 trait LazyOrder {
-    async fn lazy_order(&self, ctx: &Context<'_>, children: &Vec<ChannelId>) -> Result<()>;
+    async fn lazy_order(&self, ctx: &Context<'_>, children: &[ChannelId]) -> Result<()>;
 }
 
 impl LazyOrder for GuildId {
-    async fn lazy_order(&self, ctx: &Context<'_>, children: &Vec<ChannelId>) -> Result<()> {
+    async fn lazy_order(&self, ctx: &Context<'_>, children: &[ChannelId]) -> Result<()> {
         let mut should_be_ordered = false;
 
         let mut last_index = -1;
@@ -141,7 +141,7 @@ impl LazyOrder for GuildId {
         self.reorder_channels(ctx, children.iter().map(| x | {
             index += 1;
 
-            (x.clone(), index)
+            (*x, index)
         })).await?;
 
         Ok(())
@@ -160,26 +160,26 @@ macro_rules! channel {
     ($config:expr, $id: expr, $opts: expr) => {{
         let opts = $opts;
 
-        $config.channels.insert(ServerConfigChannelId($id.to_string()), opts);
+        $config.channels.insert(channel($id), opts);
 
-        ServerConfigChannelId($id.to_string())
+        channel($id)
     }};
 }
 
 
 impl Database {
     pub async fn update_config(&mut self, ctx: &Context<'_>, guild_id: &GuildId) -> Result<()> {
-        self.update_server(&ctx, self.get_config(&guild_id), &guild_id).await?;
+        self.update_server(ctx, self.get_config(guild_id), guild_id).await?;
 
         Ok(())
     }
 
     async fn update_server(&mut self, ctx: &Context<'_>, server_config: ServerConfig, guild_id: &GuildId) -> Result<()> {
-        let server = self.state().get_server_or_default(&guild_id);
+        let server = self.state().get_server_or_default(guild_id);
 
         // Step A.1: Ensure all declared roles exist
-        for (id, _) in &server_config.roles {
-            let exists = if server.roles.contains_key(&id) {
+        for id in server_config.roles.keys() {
+            let exists = if server.roles.contains_key(id) {
                 let roles = guild_id.roles(ctx).await;
 
                 roles.is_ok() && {
@@ -207,7 +207,7 @@ impl Database {
         // Step A.2: Mark used roles
         let mut used_roles = vec![];
 
-        for (id, _) in &server_config.roles {
+        for id in server_config.roles.keys() {
             let discord_id = server.roles[id];
 
             used_roles.push(discord_id);
@@ -216,7 +216,7 @@ impl Database {
         // Step A.3: Delete unused roles
         let mut roles = guild_id.roles(ctx).await?;
         for (id, role) in &mut roles {
-            if !used_roles.contains(&id) {
+            if !used_roles.contains(id) {
                 let _ = role.delete(ctx).await;
             }
         }
@@ -255,14 +255,14 @@ impl Database {
         }
 
         // Step B.1: Ensure all declared channels exist
-        for (id, _) in &server_config.channels {
-            let exists = if server.channels.contains_key(&id) {
+        for id in server_config.channels.keys() {
+            let exists = if server.channels.contains_key(id) {
                 let channel = ctx.http().get_channel(server.channels[id]).await;
 
                 if channel.is_ok() {
                     let channel = channel.unwrap();
 
-                    channel.guild().unwrap().kind == server_config.channels[&id].kind()
+                    channel.guild().unwrap().kind == server_config.channels[id].kind()
                 } else {
                     false
                 }
@@ -275,7 +275,7 @@ impl Database {
                     .get_guild(*guild_id).await?
                     .create_channel(ctx.http(),
                         CreateChannel::new(format!("uninitialized-{}", Random::new().get(0f32..1f32)))
-                            .kind(server_config.channels[&id].kind())
+                            .kind(server_config.channels[id].kind())
                     ).await?;
 
                 self.add(DBEvent::ChannelAdd {
@@ -288,7 +288,7 @@ impl Database {
 
         // B.2. Put settings
         for (id, config) in &server_config.channels {
-            let channel_id = server.channels[&id];
+            let channel_id = server.channels[id];
 
             let channel = ctx.http().get_channel(channel_id).await?;
 
@@ -323,22 +323,22 @@ impl Database {
                     }
                 }
 
-                return false
+                false
             }
 
             fn build<'a>(channel: &'a ServerConfigChannel, server: &'a DBServer) -> CreateChannel<'a> {
                 (match channel {
-                    Text(tl) => tl.build(&server),
-                    ServerConfigChannel::Rules(tl) => tl.build(&server),
-                    ServerConfigChannel::News(tl) => tl.build(&server),
+                    Text(tl) => tl.build(server),
+                    ServerConfigChannel::Rules(tl) => tl.build(server),
+                    ServerConfigChannel::News(tl) => tl.build(server),
                     ServerConfigChannel::Voice { name, permissions } => CreateChannel::new(name)
                         .permissions(permissions.overrides.iter().map(| x | x.as_overwrite(server)).collect::<Vec<PermissionOverwrite>>()),
                     Category { name, children:_ } => CreateChannel::new(name)
                 }).kind(channel.kind())
             }
 
-            if check_dirty(&guild_channel, &config, &server) {
-                ctx.http().edit_channel(channel_id, &build(&config, &server), Some("Quicksilver autoconfig")).await?;
+            if check_dirty(&guild_channel, config, &server) {
+                ctx.http().edit_channel(channel_id, &build(config, &server), Some("Quicksilver autoconfig")).await?;
             }
         }
 
@@ -362,15 +362,15 @@ impl Database {
         guild_id.lazy_order(ctx,
             &server_config.children.iter().map(| x | {
                 server.channels[x]
-            }).collect()
+            }).collect::<Vec<ChannelId>>()
         ).await?;
 
         for (id, config) in &server_config.channels {
             if let Category { name:_, children } = config {
-                let channel_id = server.channels[&id];
+                let channel_id = server.channels[id];
 
                 for child in children.iter() {
-                    let child_id = server.channels[&child];
+                    let child_id = server.channels[child];
 
                     let mut guild = child_id.to_channel(ctx).await?.guild().unwrap();
 
@@ -382,7 +382,7 @@ impl Database {
                 guild_id.lazy_order(ctx,
                     &children.iter().map(| x | {
                         server.channels[x]
-                    }).collect()
+                    }).collect::<Vec<ChannelId>>()
                 ).await?;
             }
         }

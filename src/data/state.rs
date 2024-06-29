@@ -49,11 +49,11 @@ impl DBEvent {
                 SideChannel::CoinFlip { success: chance.eval(0.5) }
             }),
             DBEvent::UserSendMessage { user, length } => state.mutated(|s| {
-                if user.clone() == s.last_typed_user {
+                if *user == s.last_typed_user {
                     return SideChannel::None
                 }
 
-                s.last_typed_user = user.clone();
+                s.last_typed_user = *user;
 
                 // Figure out how much XP we need
                 let xp = calculate_length_to_xp(length);
@@ -91,7 +91,7 @@ impl DBEvent {
             DBEvent::ChannelAdd { server, id, discord_id } => state.mutated(| s | {
                 let mut db_server = s.get_server_or_create(server);
 
-                db_server.channels.insert(id.clone(), discord_id.clone());
+                db_server.channels.insert(id.clone(), *discord_id);
 
                 s.update_server(server, db_server);
 
@@ -109,7 +109,7 @@ impl DBEvent {
             DBEvent::RoleAdd { server, id, discord_id } => state.mutated(| s | {
                 let mut db_server = s.get_server_or_create(server);
 
-                db_server.roles.insert(id.clone(), discord_id.clone());
+                db_server.roles.insert(id.clone(), *discord_id);
 
                 s.update_server(server, db_server);
 

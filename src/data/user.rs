@@ -20,6 +20,7 @@ use imageproc::{
 };
 use serenity::all::{CreateAttachment, User};
 use thiserror::Error;
+use crate::data::battle::LivingBuilder;
 
 #[derive(Clone, Debug)]
 pub struct DBUser {
@@ -37,7 +38,7 @@ impl Default for DBUser {
             xp_until_next_level: 100,
             level: 1,
             items: vec![],
-            life: Living::new()
+            life: LivingBuilder::new()
                 .health(150)
                 .build().unwrap()
         }
@@ -130,7 +131,7 @@ impl DBUser {
 
         // Draw display name
         let display_name = (if let Some(x) = &user.global_name {
-            &x
+            x
         } else {
             &user.name
         }).to_uppercase();
