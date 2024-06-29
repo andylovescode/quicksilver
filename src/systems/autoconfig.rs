@@ -344,6 +344,14 @@ impl Database {
         for (id, role) in &mut roles {
             if !used_roles.contains(id) {
                 if role.position > my_pos {
+                    for (role, sid) in &server.roles {
+                        if sid.clone() == id.clone() {
+                            self.add(DBEvent::RoleForget {
+                                id: role.clone(),
+                                server: *guild_id
+                            })?;
+                        }
+                    }
                     role.delete(ctx).await?;
                 }
             }
@@ -446,6 +454,14 @@ impl Database {
         // B.4. Burn it down
         for (id, channel) in guild_id.channels(ctx).await? {
             if !used_channels.contains(&id) {
+                for (channel, sid) in &server.channels {
+                    if sid.clone() == id.clone() {
+                        self.add(DBEvent::ChannelForget {
+                            id: channel.clone(),
+                            server: *guild_id
+                        })?;
+                    }
+                }
                 channel.delete(ctx).await?;
             }
         }
