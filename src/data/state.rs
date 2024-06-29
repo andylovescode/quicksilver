@@ -1,33 +1,58 @@
+use crate::data::user::DBUserError;
+use crate::systems::autoconfig::{ServerConfigChannelId, ServerConfigRoleId};
 use crate::{
-    data::items::InventoryItem,
-    data::rng::Chance,
-    data::user::DBUser,
-    utils::calculate_length_to_xp
+    data::items::InventoryItem, data::rng::Chance, data::user::DBUser,
+    utils::calculate_length_to_xp,
 };
 use serde::{Deserialize, Serialize};
 use serenity::all::{ChannelId, GuildId, RoleId, UserId};
 use std::collections::{HashMap, HashSet};
-use crate::data::user::DBUserError;
-use crate::systems::autoconfig::{ServerConfigChannelId, ServerConfigRoleId};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DBEvent {
-    Counter { user: UserId },
-    CoinFlip { chance: Chance },
-    UserSendMessage { user: UserId, length: usize },
-    AdminGive { user: UserId, item: InventoryItem },
-    AdminBurn { user: UserId, item: InventoryItem },
-    ChannelForget { server: GuildId, id: ServerConfigChannelId },
-    ChannelAdd { server: GuildId, id: ServerConfigChannelId, discord_id: ChannelId },
-    RoleForget { server: GuildId, id: ServerConfigRoleId },
-    RoleAdd { server: GuildId, id: ServerConfigRoleId, discord_id: RoleId }
+    Counter {
+        user: UserId,
+    },
+    CoinFlip {
+        chance: Chance,
+    },
+    UserSendMessage {
+        user: UserId,
+        length: usize,
+    },
+    AdminGive {
+        user: UserId,
+        item: InventoryItem,
+    },
+    AdminBurn {
+        user: UserId,
+        item: InventoryItem,
+    },
+    ChannelForget {
+        server: GuildId,
+        id: ServerConfigChannelId,
+    },
+    ChannelAdd {
+        server: GuildId,
+        id: ServerConfigChannelId,
+        discord_id: ChannelId,
+    },
+    RoleForget {
+        server: GuildId,
+        id: ServerConfigRoleId,
+    },
+    RoleAdd {
+        server: GuildId,
+        id: ServerConfigRoleId,
+        discord_id: RoleId,
+    },
 }
 
 #[derive(Debug)]
 pub enum SideChannel {
     CoinFlip { success: bool },
     AdminBurnFail { user_error: DBUserError },
-    None
+    None,
 }
 
 impl DBEvent {
@@ -46,11 +71,13 @@ impl DBEvent {
                     s.flips_in_a_row = 0
                 }
 
-                SideChannel::CoinFlip { success: chance.eval(0.5) }
+                SideChannel::CoinFlip {
+                    success: chance.eval(0.5),
+                }
             }),
             DBEvent::UserSendMessage { user, length } => state.mutated(|s| {
                 if *user == s.last_typed_user {
-                    return SideChannel::None
+                    return SideChannel::None;
                 }
 
                 s.last_typed_user = *user;
@@ -85,10 +112,14 @@ impl DBEvent {
 
                 match result {
                     Ok(_) => SideChannel::None,
-                    Err(err) => SideChannel::AdminBurnFail { user_error: err }
+                    Err(err) => SideChannel::AdminBurnFail { user_error: err },
                 }
             }),
-            DBEvent::ChannelAdd { server, id, discord_id } => state.mutated(| s | {
+            DBEvent::ChannelAdd {
+                server,
+                id,
+                discord_id,
+            } => state.mutated(|s| {
                 let mut db_server = s.get_server_or_create(server);
 
                 db_server.channels.insert(id.clone(), *discord_id);
@@ -97,7 +128,7 @@ impl DBEvent {
 
                 SideChannel::None
             }),
-            DBEvent::ChannelForget { server, id } => state.mutated(| s | {
+            DBEvent::ChannelForget { server, id } => state.mutated(|s| {
                 let mut db_server = s.get_server_or_create(server);
 
                 db_server.channels.remove(id);
@@ -106,7 +137,11 @@ impl DBEvent {
 
                 SideChannel::None
             }),
-            DBEvent::RoleAdd { server, id, discord_id } => state.mutated(| s | {
+            DBEvent::RoleAdd {
+                server,
+                id,
+                discord_id,
+            } => state.mutated(|s| {
                 let mut db_server = s.get_server_or_create(server);
 
                 db_server.roles.insert(id.clone(), *discord_id);
@@ -115,7 +150,7 @@ impl DBEvent {
 
                 SideChannel::None
             }),
-            DBEvent::RoleForget { server, id } => state.mutated(| s | {
+            DBEvent::RoleForget { server, id } => state.mutated(|s| {
                 let mut db_server = s.get_server_or_create(server);
 
                 db_server.roles.remove(id);
@@ -123,7 +158,7 @@ impl DBEvent {
                 s.update_server(server, db_server);
 
                 SideChannel::None
-            })
+            }),
         }
     }
 }
@@ -138,13 +173,13 @@ pub struct DBState {
     pub users: HashMap<UserId, DBUser>,
     pub servers: HashMap<GuildId, DBServer>,
 
-    pub last_typed_user: UserId
+    pub last_typed_user: UserId,
 }
 
 #[derive(Clone, Default, Debug)]
 pub struct DBServer {
     pub channels: HashMap<ServerConfigChannelId, ChannelId>,
-    pub roles: HashMap<ServerConfigRoleId, RoleId>
+    pub roles: HashMap<ServerConfigRoleId, RoleId>,
 }
 
 impl DBState {

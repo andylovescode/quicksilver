@@ -1,19 +1,14 @@
-use eyre::Result;
-use serenity::all::{User};
 use crate::{
     data::items::InventoryItem,
-    Context,
-    Error,
     data::state::DBEvent,
-    utils::{Admin, GetDB}
+    utils::{Admin, GetDB},
+    Context, Error,
 };
+use eyre::Result;
+use serenity::all::User;
 
 #[poise::command(slash_command)]
-pub async fn admin_give(
-    ctx: Context<'_>,
-    user: User,
-    item: InventoryItem
-) -> Result<(), Error> {
+pub async fn admin_give(ctx: Context<'_>, user: User, item: InventoryItem) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
 
     if !ctx.author().is_admin() {
@@ -25,7 +20,7 @@ pub async fn admin_give(
 
     db.add(DBEvent::AdminGive {
         user: user.id,
-        item
+        item,
     })?;
 
     ctx.say("Granted").await?;

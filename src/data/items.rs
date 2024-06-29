@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serenity::all::{Colour};
+use serenity::all::Colour;
 
 #[derive(Debug)]
 pub enum Rarity {
@@ -7,7 +7,7 @@ pub enum Rarity {
     Uncommon,
     Rare,
     Mythical,
-    Unique
+    Unique,
 }
 
 impl Rarity {
@@ -17,7 +17,7 @@ impl Rarity {
             Rarity::Uncommon => Colour(0x00FFA8),
             Rarity::Rare => Colour(0xF4DC00),
             Rarity::Mythical => Colour(0x6A00DF),
-            Rarity::Unique => Colour(0xFF0081)
+            Rarity::Unique => Colour(0xFF0081),
         }
     }
 
@@ -27,7 +27,7 @@ impl Rarity {
             Rarity::Uncommon => "[uncommon]",
             Rarity::Rare => "[rare]",
             Rarity::Mythical => "[mythical]",
-            Rarity::Unique => "[unique]"
+            Rarity::Unique => "[unique]",
         }
     }
 }
@@ -38,7 +38,9 @@ pub struct ItemInfo {
     pub description: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, Hash, Eq, PartialEq, poise::ChoiceParameter)]
+#[derive(
+    Serialize, Deserialize, Debug, Copy, Clone, Hash, Eq, PartialEq, poise::ChoiceParameter,
+)]
 pub enum InventoryItem {
     #[name = "Testing Gizmo"]
     TestGizmo,
@@ -65,7 +67,7 @@ pub enum InventoryItem {
     OracleAmulet,
 
     #[name = "Gun"]
-    Gun
+    Gun,
 }
 
 impl InventoryItem {

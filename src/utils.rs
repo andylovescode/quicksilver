@@ -1,15 +1,12 @@
-use std::sync::Arc;
 use serenity::all::{User, UserId};
+use std::sync::Arc;
 
 use tokio::sync::{Mutex, MutexGuard};
 
-use crate::{
-    data::Database,
-    Error
-};
+use crate::{data::Database, Error};
 
 pub trait GetDB {
-    fn db(&self, purpose: &str) -> impl std::future::Future<Output=MutexGuard<Database>> + Send;
+    fn db(&self, purpose: &str) -> impl std::future::Future<Output = MutexGuard<Database>> + Send;
 }
 
 impl<'a> GetDB for poise::Context<'a, Arc<Mutex<Database>>, Error> {
@@ -23,11 +20,7 @@ pub fn calculate_length_to_xp(len: &usize) -> u64 {
 
     let max = 15f64;
 
-    let limited = if curve > max {
-        max
-    } else {
-        curve
-    }; // Clamp the curve to 15
+    let limited = if curve > max { max } else { curve }; // Clamp the curve to 15
 
     limited.round() as u64
 }

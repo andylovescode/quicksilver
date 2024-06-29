@@ -1,47 +1,32 @@
-use std::{
-    path::Path,
-    sync::Arc
-};
+use std::{path::Path, sync::Arc};
 
-use eyre::Result;
-use poise::{
-    builtins::create_application_commands,
-    serenity_prelude as serenity
-};
-use serenity::Command;
-use tokio::sync::Mutex;
+use crate::commands::test::test;
 use crate::{
     commands::{
-        admin_burn::admin_burn,
-        coin::coinflip,
-        counter::counter,
-        inventory::inventory,
-        status::status,
-        admin_give::admin_give
+        admin_burn::admin_burn, admin_give::admin_give, coin::coinflip, counter::counter,
+        inventory::inventory, status::status,
     },
     config::get_testing_guild,
     data::Database,
-    systems::xp_leveling::XPHandler
+    systems::xp_leveling::XPHandler,
 };
-use crate::commands::test::test;
+use eyre::Result;
+use poise::{builtins::create_application_commands, serenity_prelude as serenity};
+use serenity::Command;
+use tokio::sync::Mutex;
 
-pub mod data;
-pub mod utils;
-pub mod config;
 pub mod commands;
+pub mod config;
+pub mod data;
 pub mod systems;
+pub mod utils;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Arc<Mutex<Database>>, Error>;
 
 async fn eyre_main() -> Result<()> {
     // Create db
-    let db = Arc::new(
-        Mutex::new(
-            Database::new(Path::new("./db.json").into())?
-        )
-    );
-
+    let db = Arc::new(Mutex::new(Database::new(Path::new("./db.json").into())?));
 
     // We need message perms
     let intents = serenity::GatewayIntents::all();
@@ -60,13 +45,12 @@ async fn eyre_main() -> Result<()> {
                 inventory(),
                 admin_give(),
                 admin_burn(),
-                test()
+                test(),
             ],
 
             // And default settings
             ..Default::default()
         })
-
         // And when we set things up
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
@@ -77,12 +61,9 @@ async fn eyre_main() -> Result<()> {
                 Command::set_global_commands(ctx, commands).await?;
 
                 // And load our database
-                Ok(
-                    db_for_poise
-                )
+                Ok(db_for_poise)
             })
         })
-
         // And let's set things up
         .build();
 

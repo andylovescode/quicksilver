@@ -1,20 +1,15 @@
-use eyre::Result;
-use serenity::all::{User};
 use crate::{
-    Context,
-    Error,
     data::items::InventoryItem,
     data::state::DBEvent,
+    data::state::SideChannel,
     utils::{Admin, GetDB},
-    data::state::SideChannel
+    Context, Error,
 };
+use eyre::Result;
+use serenity::all::User;
 
 #[poise::command(slash_command)]
-pub async fn admin_burn(
-    ctx: Context<'_>,
-    user: User,
-    item: InventoryItem
-) -> Result<(), Error> {
+pub async fn admin_burn(ctx: Context<'_>, user: User, item: InventoryItem) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
 
     if !ctx.author().is_admin() {
@@ -26,7 +21,7 @@ pub async fn admin_burn(
 
     let err = db.add(DBEvent::AdminBurn {
         user: user.id,
-        item
+        item,
     })?;
 
     match err {
@@ -36,7 +31,7 @@ pub async fn admin_burn(
         SideChannel::None => {
             ctx.say("Burned").await?;
         }
-        state => panic!("Expected AdminBurnFail | None but got {:?}", state)
+        state => panic!("Expected AdminBurnFail | None but got {:?}", state),
     }
 
     Ok(())

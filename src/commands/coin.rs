@@ -1,9 +1,8 @@
 use crate::{
+    data::state::SideChannel,
     data::{rng::Chance, state::DBEvent},
     utils::GetDB,
-    Context,
-    Error,
-    data::state::SideChannel
+    Context, Error,
 };
 
 /// Flip a coin!
@@ -25,11 +24,11 @@ pub async fn coinflip(ctx: Context<'_>) -> eyre::Result<(), Error> {
                     db.state().flips_in_a_row,
                     2u32.pow(db.state().flips_in_a_row)
                 ))
-                    .await?;
+                .await?;
             } else {
                 ctx.say("Unfortunately, you landed on tails.").await?;
             }
-        },
+        }
         event => {
             panic!("CoinFlip event returned {:?} not CoinFlip", event)
         }

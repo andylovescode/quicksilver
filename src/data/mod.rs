@@ -1,17 +1,14 @@
-use std::{
-    fmt::Debug,
-    path::Path
-};
+use std::{fmt::Debug, path::Path};
 
+use crate::data::state::SideChannel;
 use eyre::{OptionExt, Result};
 use state::{DBEvent, DBState};
-use crate::data::state::SideChannel;
 
-pub mod rng;
-pub mod user;
-pub mod items;
-pub mod state;
 mod battle;
+pub mod items;
+pub mod rng;
+pub mod state;
+pub mod user;
 
 #[derive(Debug)]
 pub struct Database {
@@ -54,7 +51,10 @@ impl Database {
         let file_content = serde_json::to_string_pretty(&self.timeline)?;
         std::fs::write(&self.path, file_content)?;
 
-        std::fs::write(self.path.to_str().ok_or_eyre("Invalid path")?.to_string() + ".log", format!("{:#?}", self.state))?;
+        std::fs::write(
+            self.path.to_str().ok_or_eyre("Invalid path")?.to_string() + ".log",
+            format!("{:#?}", self.state),
+        )?;
 
         Ok(())
     }

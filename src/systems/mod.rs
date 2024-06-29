@@ -1,2 +1,2 @@
-pub mod xp_leveling;
 pub mod autoconfig;
+pub mod xp_leveling;

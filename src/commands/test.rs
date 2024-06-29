@@ -1,15 +1,12 @@
-use eyre::Result;
-use crate::{
-    Context,
-    Error,
-    utils::{Admin, GetDB}
-};
 use crate::systems::autoconfig::ServerConfigRoleId;
+use crate::{
+    utils::{Admin, GetDB},
+    Context, Error,
+};
+use eyre::Result;
 
 #[poise::command(slash_command)]
-pub async fn test(
-    ctx: Context<'_>
-) -> Result<(), Error> {
+pub async fn test(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
 
     if !ctx.author().is_admin() {
@@ -23,7 +20,13 @@ pub async fn test(
 
     let member = ctx.author_member().await.unwrap();
 
-    member.add_role(ctx, db.state().servers[&ctx.guild_id().unwrap()].roles[&ServerConfigRoleId("admin".to_string())]).await?;
+    member
+        .add_role(
+            ctx,
+            db.state().servers[&ctx.guild_id().unwrap()].roles
+                [&ServerConfigRoleId("admin".to_string())],
+        )
+        .await?;
 
     ctx.say("did the thing").await?;
 

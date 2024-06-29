@@ -1,8 +1,4 @@
-use crate::{
-    utils::GetDB,
-    Context,
-    Error
-};
+use crate::{utils::GetDB, Context, Error};
 use poise::CreateReply;
 use serenity::all::{CreateEmbed, User};
 use std::collections::HashMap;
@@ -21,11 +17,15 @@ pub async fn inventory(ctx: Context<'_>, user: Option<User>) -> eyre::Result<(),
     };
 
     if db_user.items.is_empty() {
-        ctx.say(format!("{} inventory is empty.", if let Some(x) = &user {
-            format!("<@{}>'s", x.id)
-        } else {
-            "Your".to_string()
-        })).await?;
+        ctx.say(format!(
+            "{} inventory is empty.",
+            if let Some(x) = &user {
+                format!("<@{}>'s", x.id)
+            } else {
+                "Your".to_string()
+            }
+        ))
+        .await?;
 
         return Ok(());
     }
@@ -39,7 +39,7 @@ pub async fn inventory(ctx: Context<'_>, user: Option<User>) -> eyre::Result<(),
     }
 
     let mut message = CreateReply::default();
-    
+
     for (item, count) in count_map {
         let info = item.info();
 
@@ -51,7 +51,7 @@ pub async fn inventory(ctx: Context<'_>, user: Option<User>) -> eyre::Result<(),
                     format!("{} **{}**", info.name, info.rarity.name())
                 })
                 .description(info.description)
-                .color(info.rarity.color())
+                .color(info.rarity.color()),
         );
     }
 

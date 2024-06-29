@@ -1,26 +1,21 @@
-use std::{
-    fmt::{Display, Formatter},
-    path::Path
-};
+use crate::data::battle::LivingBuilder;
+use crate::{data::battle::Living, data::items::InventoryItem};
 use ab_glyph::{FontRef, PxScale};
-use crate::{
-    data::items::InventoryItem,
-    data::battle::Living
-};
-use eyre::{Result};
+use eyre::Result;
 use image::{
-    GenericImage,
-    Rgba,
-    RgbaImage,
-    imageops::{FilterType, overlay}
+    imageops::{overlay, FilterType},
+    GenericImage, Rgba, RgbaImage,
 };
 use imageproc::{
     drawing::{draw_filled_rect_mut, draw_text_mut},
-    rect::Rect
+    rect::Rect,
 };
 use serenity::all::{CreateAttachment, User};
+use std::{
+    fmt::{Display, Formatter},
+    path::Path,
+};
 use thiserror::Error;
-use crate::data::battle::LivingBuilder;
 
 #[derive(Clone, Debug)]
 pub struct DBUser {
@@ -28,7 +23,7 @@ pub struct DBUser {
     pub xp_until_next_level: u64,
     pub level: u64,
     pub items: Vec<InventoryItem>,
-    pub life: Living
+    pub life: Living,
 }
 
 impl Default for DBUser {
@@ -38,9 +33,7 @@ impl Default for DBUser {
             xp_until_next_level: 100,
             level: 1,
             items: vec![],
-            life: LivingBuilder::new()
-                .health(150)
-                .build().unwrap()
+            life: LivingBuilder::new().health(150).build().unwrap(),
         }
     }
 }
@@ -48,14 +41,16 @@ impl Default for DBUser {
 #[derive(Error, Debug)]
 pub enum DBUserError {
     UserDoesNotHaveItem(InventoryItem),
-    FontFailedToParse
+    FontFailedToParse,
 }
 
 impl Display for DBUserError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DBUserError::UserDoesNotHaveItem(item) => f.write_str(&format!("user does not have item {:?}", item)),
-            DBUserError::FontFailedToParse => f.write_str("Font failed to parse")
+            DBUserError::UserDoesNotHaveItem(item) => {
+                f.write_str(&format!("user does not have item {:?}", item))
+            }
+            DBUserError::FontFailedToParse => f.write_str("Font failed to parse"),
         }
     }
 }
@@ -118,7 +113,8 @@ impl DBUser {
         let mut img = RgbaImage::new(size.0, size.1);
         let bg = Rgba([17, 17, 17, 255]);
 
-        for x in 0..size.0 { // Fill background
+        for x in 0..size.0 {
+            // Fill background
             for y in 0..size.1 {
                 *img.get_pixel_mut(x, y) = bg; // Set BG Color
             }
@@ -127,14 +123,17 @@ impl DBUser {
         // Get font
         let light_bytes = std::fs::read("./fonts/light.ttf")?;
 
-        let font_light = FontRef::try_from_slice(light_bytes.as_slice()).ok().ok_or(DBUserError::FontFailedToParse)?;
+        let font_light = FontRef::try_from_slice(light_bytes.as_slice())
+            .ok()
+            .ok_or(DBUserError::FontFailedToParse)?;
 
         // Draw display name
         let display_name = (if let Some(x) = &user.global_name {
             x
         } else {
             &user.name
-        }).to_uppercase();
+        })
+        .to_uppercase();
 
         let text_scale_light = 1.333f32;
 
@@ -145,10 +144,13 @@ impl DBUser {
             40,
             PxScale::from(40f32 * text_scale_light),
             &font_light,
-            &display_name
+            &display_name,
         );
 
-        let level = format!("Level {} ({}/{})", self.level, self.this_levels_xp, self.xp_until_next_level);
+        let level = format!(
+            "Level {} ({}/{})",
+            self.level, self.this_levels_xp, self.xp_until_next_level
+        );
 
         draw_text_mut(
             &mut img,
@@ -157,7 +159,7 @@ impl DBUser {
             98,
             PxScale::from(20f32 * text_scale_light),
             &font_light,
-            &level
+            &level,
         );
 
         let health = format!("{} / {} Health", self.life.health(), self.life.max_health());
@@ -169,48 +171,47 @@ impl DBUser {
             129,
             PxScale::from(20f32 * text_scale_light),
             &font_light,
-            &health
+            &health,
         );
 
         // Leveling bar
         let leveling_bar_pos = (224f32, 168f32);
         let leveling_bar_size = (286f32, 30f32);
         let filled_percentage = self.this_levels_xp as f32 / self.xp_until_next_level as f32;
-        let filled_size = ( if leveling_bar_size.0 * filled_percentage > 1f32 {
-            leveling_bar_size.0 * filled_percentage
-        } else {
-            1f32
-        }, leveling_bar_size.1 );
+        let filled_size = (
+            if leveling_bar_size.0 * filled_percentage > 1f32 {
+                leveling_bar_size.0 * filled_percentage
+            } else {
+                1f32
+            },
+            leveling_bar_size.1,
+        );
 
         // Fill the outline
         draw_filled_rect_mut(
             &mut img,
             rect!(leveling_bar_pos, leveling_bar_size),
-            Rgba([255, 255, 255, 255])
+            Rgba([255, 255, 255, 255]),
         );
 
         // Hollow out the outline
         let outline_thickness = 1f32;
         let outline_hole_pos = (
             leveling_bar_pos.0 + outline_thickness,
-            leveling_bar_pos.1 + outline_thickness
+            leveling_bar_pos.1 + outline_thickness,
         );
         let outline_hole_size = (
             leveling_bar_size.0 - 2f32 * outline_thickness,
-            leveling_bar_size.1 - 2f32 * outline_thickness
+            leveling_bar_size.1 - 2f32 * outline_thickness,
         );
 
-        draw_filled_rect_mut(
-            &mut img,
-            rect!(outline_hole_pos, outline_hole_size),
-            bg
-        );
+        draw_filled_rect_mut(&mut img, rect!(outline_hole_pos, outline_hole_size), bg);
 
         // Draw the filled portion
         draw_filled_rect_mut(
             &mut img,
             rect!(leveling_bar_pos, filled_size),
-            Rgba([255, 255, 255, 255])
+            Rgba([255, 255, 255, 255]),
         );
 
         // Health bar
@@ -220,25 +221,24 @@ impl DBUser {
         draw_filled_rect_mut(
             &mut img,
             rect!(health_bar_pos, health_bar_size),
-            Rgba([255, 117, 117, 255])
+            Rgba([255, 117, 117, 255]),
         );
 
         let health_filled_percentage = self.life.health() as f32 / self.life.max_health() as f32;
-        let health_filled_size = (health_bar_size.0 * health_filled_percentage, health_bar_size.1);
+        let health_filled_size = (
+            health_bar_size.0 * health_filled_percentage,
+            health_bar_size.1,
+        );
 
         draw_filled_rect_mut(
             &mut img,
             rect!(health_bar_pos, health_filled_size),
-            Rgba([255, 255, 255, 255])
+            Rgba([255, 255, 255, 255]),
         );
 
         // Render user's profile picture
         let avatar_url = user.avatar_url().unwrap_or(user.default_avatar_url());
-        let avatar_bytes = reqwest::get(avatar_url)
-            .await?
-            .bytes()
-            .await?;
-
+        let avatar_bytes = reqwest::get(avatar_url).await?.bytes().await?;
 
         let avatar_image = image::load_from_memory(&avatar_bytes)?;
 
@@ -250,7 +250,8 @@ impl DBUser {
         for x in 0..tiny.width() {
             for y in 0..tiny.height() {
                 let pos = (x as f32 / size, y as f32 / size);
-                let distance = (1f32 - (pos.0 * 2f32)).powf(2f32) + (1f32 - (pos.1 * 2f32)).powf(2f32);
+                let distance =
+                    (1f32 - (pos.0 * 2f32)).powf(2f32) + (1f32 - (pos.1 * 2f32)).powf(2f32);
 
                 if distance > 1f32 {
                     tiny.put_pixel(x, y, bg);
