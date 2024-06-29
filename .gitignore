@@ -1,1 +1,5 @@
 /target
+db.json
+db.json.log
+temp.png
+.env
