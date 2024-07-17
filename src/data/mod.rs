@@ -6,6 +6,7 @@ use state::{DBEvent, DBState};
 
 mod battle;
 pub mod items;
+pub mod places;
 pub mod rng;
 pub mod state;
 pub mod user;

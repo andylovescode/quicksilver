@@ -6,13 +6,13 @@ use crate::{
 		Database,
 	},
 	systems::autoconfig::data::{
-		ServerConfig, ServerConfigChannel::Category, ServerConfigPermissions,
+		role, ServerConfig, ServerConfigChannel::Category, ServerConfigPermissions,
 	},
 	Context,
 };
 use serenity::all::{
 	ChannelId, CreateChannel, EditChannel, EditRole, GuildChannel, GuildId, PermissionOverwrite,
-	PermissionOverwriteType, Permissions, RoleId,
+	PermissionOverwriteType,
 };
 use std::collections::HashMap;
 use thiserror::Error;
@@ -56,21 +56,11 @@ pub fn overrides(
 	server: &DBServer,
 	perms: &ServerConfigPermissions,
 ) -> Vec<PermissionOverwrite> {
-	let mut overrides = perms
+	perms
 		.overrides
 		.iter()
 		.map(|x| x.as_overwrite(server))
-		.collect::<Vec<PermissionOverwrite>>();
-
-	let guild_num = guild_id.get();
-
-	overrides.push(PermissionOverwrite {
-		kind: PermissionOverwriteType::Role(RoleId::new(guild_num)),
-		allow: perms.base,
-		deny: Permissions::empty(),
-	});
-
-	overrides
+		.collect::<Vec<PermissionOverwrite>>()
 }
 
 trait LazyOrder {
@@ -143,6 +133,16 @@ impl Database {
 	) -> eyre::Result<()> {
 		let mut server = self.state().get_server_or_default(guild_id);
 
+		if server.roles.get(&role("all")) != Some(&guild_id.everyone_role()) {
+			self.add(DBEvent::RoleAdd {
+				server: *guild_id,
+				id: role("all"),
+				discord_id: guild_id.everyone_role(),
+			})?;
+
+			server = self.state().get_server_or_default(guild_id);
+		}
+
 		let mut roles = guild_id.roles(ctx).await?;
 
 		// Step A.1: Ensure all declared roles exist
@@ -183,17 +183,43 @@ impl Database {
 			.ok_or(AutoconfigError::OptionIsNone)?;
 
 		for (id, role) in &mut roles {
-			if !used_roles.contains(id) && role.position > my_pos {
-				for (role, sid) in &server.roles {
-					if *sid == *id {
-						self.add(DBEvent::RoleForget {
-							id: role.clone(),
-							server: *guild_id,
-						})?;
-					}
-				}
-				role.delete(ctx).await?;
+			if used_roles.contains(id) {
+				// If the role is used, don't delete it
+				continue;
 			}
+
+			if role.position >= my_pos {
+				// If the role is above us, don't delete it
+				continue;
+			}
+
+			if role.tags.bot_id.is_some() {
+				// If it's a bot role, don't delete it
+				continue;
+			}
+
+			if role.id == role.guild_id.everyone_role() {
+				// If it's the @everyone role, don't delete it
+				continue;
+			}
+
+			role.delete(ctx).await?;
+
+			let config_id = server
+				.roles
+				.iter()
+				.find(|(_, other)| role.id.get() == other.get());
+
+			if config_id.is_none() {
+				continue;
+			}
+
+			let (role_cfg_id, _) = config_id.unwrap();
+
+			self.add(DBEvent::RoleForget {
+				id: role_cfg_id.clone(),
+				server: *guild_id,
+			})?;
 		}
 
 		// Step A.4: Configure misconfigured roles
@@ -288,6 +314,7 @@ impl Database {
 			let guild = &channels[&channel_id];
 
 			if config.check_dirty(guild, &server) {
+				println!("{} is dirty", channel_id.name(&ctx).await?);
 				channel_id
 					.edit(ctx, config.build(guild_id, &server))
 					.await?;

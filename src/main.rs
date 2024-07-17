@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc};
 use crate::{
 	commands::{
 		admin_burn::admin_burn, admin_give::admin_give, coin::coinflip, counter::counter,
-		inventory::inventory, status::status, test::test,
+		goto::goto, inventory::inventory, status::status, test::test,
 	},
 	config::get_testing_guild,
 	data::Database,
@@ -45,6 +45,7 @@ async fn eyre_main() -> Result<()> {
 				admin_give(),
 				admin_burn(),
 				test(),
+				goto(),
 			],
 
 			// And default settings

@@ -1,5 +1,5 @@
 use crate::{
-	data::Database,
+	data::{places::PLACES, Database},
 	systems::autoconfig::{
 		data,
 		data::{
@@ -29,32 +29,8 @@ macro_rules! channel {
 	}};
 }
 
-pub struct Place<'a> {
-	name: &'a str,
-	id: &'a str,
-}
-
-macro_rules! place {
-	($name: expr, $id: expr) => {
-		Place {
-			name: $name,
-			id: $id,
-		}
-	};
-}
-
-static PLACES: &[Place] = &[
-	place!("The Forest", "forest"),
-	place!("The Capital", "capital"),
-	place!("Sir Minsley's Castle", "minsley-manor"),
-	place!("Zyex's Home", "zyex-house"),
-	place!("Moonpool's Observatory", "moonpool-observatory"),
-	place!("Vivi's Tower", "vivi-tower"),
-	place!("Test Area", "test"),
-];
-
 impl Database {
-	pub fn get_config(&self, _: &GuildId) -> ServerConfig {
+	pub fn get_config(&self, gid: &GuildId) -> ServerConfig {
 		let mut config = ServerConfig {
 			children: vec![],
 			channels: HashMap::new(),
@@ -86,9 +62,9 @@ impl Database {
 		for place in PLACES {
 			role!(
 				config,
-				&format!("place/{}", place.id),
+				&format!("places/{}", place.id()),
 				ServerConfigRole {
-					name: format!("📍 {}", place.name),
+					name: format!("📍 {}", place.name()),
 					color: Colour(0x000000),
 					permissions: Permissions::empty()
 				}
@@ -121,33 +97,40 @@ impl Database {
 		for place in PLACES {
 			let visible_only_here = ServerConfigPermissions {
 				base: Permissions::default() & !Permissions::VIEW_CHANNEL,
-				overrides: vec![ServerConfigPermissionOverwrite {
-					role: data::role(&format!("place/{}", place.id)),
-					allow: Permissions::VIEW_CHANNEL,
-					deny: Permissions::empty(),
-				}],
+				overrides: vec![
+					ServerConfigPermissionOverwrite {
+						role: data::role("all"),
+						allow: Permissions::empty(),
+						deny: Permissions::VIEW_CHANNEL,
+					},
+					ServerConfigPermissionOverwrite {
+						role: data::role(&format!("places/{}", place.id())),
+						allow: Permissions::VIEW_CHANNEL,
+						deny: Permissions::empty(),
+					},
+				],
 			};
 
 			config.children.push(channel!(
 				config,
-				&format!("places/{}", place.id),
+				&format!("places/{}", place.id()),
 				ServerConfigChannel::Category {
-					name: format!("~ {} ~", place.name),
+					name: format!("~ {} ~", place.name()),
 					children: vec![
 						channel!(
 							config,
-							&format!("places/{}/text", place.id),
+							&format!("places/{}/text", place.id()),
 							ServerConfigChannel::Text(ServerConfigTextLike {
-								name: format!("{}-text", place.id),
+								name: format!("{}-text", place.id()),
 								description: "A place in Alternate Reality".to_string(),
 								permissions: visible_only_here.clone()
 							})
 						),
 						channel!(
 							config,
-							&format!("places/{}/vc", place.id),
+							&format!("places/{}/vc", place.id()),
 							ServerConfigChannel::Voice {
-								name: format!("{}-vc", place.id),
+								name: format!("{}-vc", place.id()),
 								permissions: visible_only_here.clone()
 							}
 						),
